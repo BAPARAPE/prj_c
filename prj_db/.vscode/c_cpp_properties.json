@@ -1,0 +1,26 @@
+{
+    "version": 4,
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "/usr/include",
+                "/usr/include/c++/14",                // Ajoute ce chemin
+                "/usr/include/x86_64-linux-gnu",      // Ajoute ce chemin
+                "/usr/lib/gcc/x86_64-linux-gnu/14/include",  // Ajoute ce chemin
+                "${workspaceFolder}/**"
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/gcc",
+            "intelliSenseMode": "linux-gcc-x64",
+            "browse": {
+                "path": [
+                    "/usr/include",
+                    "/usr/include/c++/14",
+                    "/usr/include/x86_64-linux-gnu",
+                    "/usr/lib/gcc/x86_64-linux-gnu/14/include"
+                ]
+            }
+        }
+    ]
+}
