@@ -1,3 +1,4 @@
+#include "db.h"
 #include "repl.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -48,13 +49,23 @@ void read_input(InputBuffer* input_buffer) {
     input_buffer->buffer[input_buffer->input_length] = '\0';
 }
 
-void execute_statement(InputBuffer* input_buffer) {
+void execute_statement(InputBuffer* input_buffer, Table* table) {
     if (strncmp(input_buffer->buffer, "INSERT", 6) == 0) {
-        printf("Commande INSERT exécutée.\n");
+
+        int id;
+        char name[40];
+        char mail[40];
+
+        if (sscanf(input_buffer->buffer, "INSERT %d %99s %99s", &id, name, mail) == 3) {
+            insert_student(table, id, name, mail);
+        } else {
+            printf("Erreur dans la commande INSERT. Format attendu: INSERT <id> <name> <email>\n");
+        }
+
     }
     else if (strcmp(input_buffer->buffer, "SELECT") == 0) {
-        printf("Commande SELECT exécutée.\n");
-    }
+        select_students(table);
+     }
     else if (strcmp(input_buffer->buffer, "exit") == 0) {
         close_input_buffer(input_buffer);
         printf("Bye!\n");
@@ -66,13 +77,14 @@ void execute_statement(InputBuffer* input_buffer) {
 }
 
 void start_repl() {
+    Table* table = new_table();
     InputBuffer* input_buffer = new_input_buffer();
 
     while(true) {
         print_prompt();
         read_input(input_buffer);
 
-        execute_statement(input_buffer);
+        execute_statement(input_buffer, table);
     }
 }
 
