@@ -56,7 +56,7 @@ void execute_statement(InputBuffer* input_buffer, Table* table) {
         char name[40];
         char mail[40];
 
-        if (sscanf(input_buffer->buffer, "INSERT %d %99s %99s", &id, name, mail) == 3) {
+        if (sscanf(input_buffer->buffer, "INSERT %d %39s %39s", &id, name, mail) == 3) {
             insert_student(table, id, name, mail);
         } else {
             printf("Erreur dans la commande INSERT. Format attendu: INSERT <id> <name> <email>\n");
