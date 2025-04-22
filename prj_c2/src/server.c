@@ -6,8 +6,18 @@
 #include <pthread.h>
 #include <errno.h>
 
-#define PORT 12345
+#define PORT 3155
 #define BUFFER_SIZE 2048
+
+void enregistrer_dans_db(const char* username, const char* ssh_key) {
+    FILE* db = fopen("db.txt", "a");
+    if (db == NULL) {
+        perror("Erreur ouverture DB");
+        return;
+    }
+    fprintf(db, "Utilisateur: %s\nClé SSH: %s\n---\n", username, ssh_key);
+    fclose(db);
+}
 
 struct InfoClient {
     int socket; 
