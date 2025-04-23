@@ -1,136 +1,92 @@
+#include "server.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <arpa/inet.h>
+#include <unistd.h> 
 #include <pthread.h>
-#include <errno.h>
+#include <sqlite3.h>
 
-#define PORT 3155
-#define BUFFER_SIZE 2048
-
-void enregistrer_dans_db(const char* username, const char* ssh_key) {
-    FILE* db = fopen("db.txt", "a");
-    if (db == NULL) {
-        perror("Erreur ouverture DB");
-        return;
+void init_db(sqlite3** db)  {
+    if (sqlite3_open("data.db", db) != SQLITE_OK) {
+        fprintf(stderr, "Erreur ouverture DB: %s\n", sqlite3_errmsg(*db));  // corrigé: fprint -> fprintf
+        exit(EXIT_FAILURE);
     }
-    fprintf(db, "Utilisateur: %s\nClé SSH: %s\n---\n", username, ssh_key);
-    fclose(db);
-}
 
-struct InfoClient {
-    int socket; 
-}; 
+    const char* sql_create_table = 
+        "CREATE TABLE IF NOT EXISTS users ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "username TEXT NOT NULL, "
+        "ssh_key TEXT NOT NULL);";  // petit espace inutile retiré
+
+    char* errmsg; 
+    if (sqlite3_exec(*db, sql_create_table, 0, 0, &errmsg) != SQLITE_OK) {
+        fprintf(stderr, "Erreur création table: %s\n", errmsg);  // corrigé: ‰s -> %s
+        sqlite3_free(errmsg);
+        exit(EXIT_FAILURE);
+    }    
+}
 
 void* gerer_client(void* arg) {
-    struct InfoClient* info_client = (struct InfoClient*) arg;
-    int client_socket = info_client->socket;
-    free(info_client);
+    InfoClient* infoclient = (InfoClient*)arg;
+    int client_socket = infoclient->socket;
+    sqlite3* db = infoclient->db;
+    free(infoclient);
 
     char buffer[BUFFER_SIZE];
-    char username[100];
-    char ssh_key[1024];
+    char username[100] = "";
+    char ssh_key[1024] = "";
 
-    username[0] = '\0';
-    ssh_key[0] = '\0';
-
-    // Lire REGISTER
+    // Lecture de LOGIN
     int bytes_read = read(client_socket, buffer, BUFFER_SIZE - 1);
     if (bytes_read <= 0) {
-        perror("Erreur lecture du REGISTER");
+        perror("Erreur lecture LOGIN");
         close(client_socket);
         pthread_exit(NULL);
     }
+    buffer[bytes_read] = '\0'; 
 
-    buffer[bytes_read] = '\0';
-
-    if (strncmp(buffer, "REGISTER ", 9) == 0) {
-        strncpy(username, buffer + 9, sizeof(username) - 1);
-        username[strcspn(username, "\r\n")] = '\0';
-        printf("Username validé: %s\n", username);
-    } else {
-        printf("Commande invalide (attendu REGISTER)\n");
+    char commande[50], param[1024];
+    if (sscanf(buffer, "%s %[^\n]", commande, param) != 2 || strcmp(commande, "LOGIN") != 0) {  // corrigé: '%s' -> "%s"
+        printf("Commande LOGIN invalide.\n");
         close(client_socket);
         pthread_exit(NULL);
     }
+    strncpy(username, param, sizeof(username) - 1);
+    printf("Username reçu: %s\n", username); 
 
-    // Lire SEND_KEY
-    memset(buffer, 0, sizeof(buffer)); // nettoyage du buffer
+    memset(buffer, 0, sizeof(buffer));
     bytes_read = read(client_socket, buffer, BUFFER_SIZE - 1);
     if (bytes_read <= 0) {
-        perror("Erreur lecture du SEND_KEY");
+        perror("Erreur lecture KEY");
+        close(client_socket);
+        pthread_exit(NULL);
+    }
+    buffer[bytes_read] = '\0';
+
+    if (sscanf(buffer, "%s %[^\n]", commande, param) != 2 || strcmp(commande, "KEY") != 0) {  // corrigé: '%s' -> "%s"
+        printf("Commande KEY invalide.\n");
         close(client_socket);
         pthread_exit(NULL);
     }
 
-    buffer[bytes_read] = '\0';
+    strncpy(ssh_key, param, sizeof(ssh_key) - 1);
+    printf("Clé SSH reçue pour %s : %s\n", username, ssh_key);
 
-    if (strncmp(buffer, "SEND_KEY ", 9) == 0) {
-        strncpy(ssh_key, buffer + 9, sizeof(ssh_key) - 1);
-        ssh_key[strcspn(ssh_key, "\r\n")] = '\0';
-        printf("Clé SSH reçue pour %s :\n%s\n", username, ssh_key);
+    // Insertion dans la base SQLite
+    char* errmsg;
+    char sql_insert[1500];
+    snprintf(sql_insert, sizeof(sql_insert),
+             "INSERT INTO users (username, ssh_key) VALUES ('%s', '%s');",
+             username, ssh_key);
+
+    if (sqlite3_exec(db, sql_insert, 0, 0, &errmsg) != SQLITE_OK) {
+        fprintf(stderr, "Erreur insertion: %s\n", errmsg);
+        sqlite3_free(errmsg);
     } else {
-        printf("Commande invalide (attendu SEND_KEY)\n");
+        printf("Utilisateur %s enregistré en DB.\n", username);
     }
 
-    fflush(stdout); // Force l'affichage immédiat
+    fflush(stdout);
     close(client_socket);
     pthread_exit(NULL);
-}
-
-int main() {
-    int server_socket; 
-    struct sockaddr_in server_addr, client_addr; 
-    socklen_t client_len = sizeof(client_addr);
-
-    // Création socket
-    server_socket = socket(AF_INET, SOCK_STREAM, 0);
-    if (server_socket < 0) {
-        perror("Erreur création socket");
-        exit(EXIT_FAILURE);
-    }
-
-    // Liaison du socket à une adresse
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(PORT);
-    server_addr.sin_addr.s_addr = INADDR_ANY; 
-
-    if (bind(server_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-        perror("Erreur bind");
-        exit(EXIT_FAILURE);
-    }
-
-    if (listen(server_socket, 5) < 0) {
-        perror("Erreur listen");
-        exit(EXIT_FAILURE);
-    }
-
-    printf("Serveur en écoute sur le port %d...\n", PORT);
-
-    while(1) {
-        int client_socket = accept(server_socket, (struct sockaddr*) &client_addr, &client_len);
-        if(client_socket < 0) {
-            perror("Erreur accept");
-            continue;
-        }
-
-        printf("Nouveau client connecté.\n");
-
-        struct InfoClient* data = malloc(sizeof(struct InfoClient));
-        data->socket = client_socket;
-
-        pthread_t thread_id; 
-        int result = pthread_create(&thread_id, NULL, gerer_client, data);
-        if (result != 0) {
-            perror("Erreur pthread_create");
-            close(client_socket);
-            free(data);
-        } else {
-            pthread_detach(thread_id);
-        }
-    }
-
-    close(server_socket);
-    return 0;
 }
