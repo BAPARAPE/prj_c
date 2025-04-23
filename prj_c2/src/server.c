@@ -8,7 +8,7 @@
 
 void init_db(sqlite3** db)  {
     if (sqlite3_open("data.db", db) != SQLITE_OK) {
-        fprintf(stderr, "Erreur ouverture DB: %s\n", sqlite3_errmsg(*db));  // corrigé: fprint -> fprintf
+        fprintf(stderr, "Erreur ouverture DB: %s\n", sqlite3_errmsg(*db)); 
         exit(EXIT_FAILURE);
     }
 
@@ -16,11 +16,11 @@ void init_db(sqlite3** db)  {
         "CREATE TABLE IF NOT EXISTS users ("
         "id INTEGER PRIMARY KEY AUTOINCREMENT, "
         "username TEXT NOT NULL, "
-        "ssh_key TEXT NOT NULL);";  // petit espace inutile retiré
+        "ssh_key TEXT NOT NULL);";  
 
     char* errmsg; 
     if (sqlite3_exec(*db, sql_create_table, 0, 0, &errmsg) != SQLITE_OK) {
-        fprintf(stderr, "Erreur création table: %s\n", errmsg);  // corrigé: ‰s -> %s
+        fprintf(stderr, "Erreur création table: %s\n", errmsg);  
         sqlite3_free(errmsg);
         exit(EXIT_FAILURE);
     }    
@@ -46,7 +46,7 @@ void* gerer_client(void* arg) {
     buffer[bytes_read] = '\0'; 
 
     char commande[50], param[1024];
-    if (sscanf(buffer, "%s %[^\n]", commande, param) != 2 || strcmp(commande, "LOGIN") != 0) {  // corrigé: '%s' -> "%s"
+    if (sscanf(buffer, "%s %[^\n]", commande, param) != 2 || strcmp(commande, "LOGIN") != 0) {  
         printf("Commande LOGIN invalide.\n");
         close(client_socket);
         pthread_exit(NULL);
@@ -63,7 +63,7 @@ void* gerer_client(void* arg) {
     }
     buffer[bytes_read] = '\0';
 
-    if (sscanf(buffer, "%s %[^\n]", commande, param) != 2 || strcmp(commande, "KEY") != 0) {  // corrigé: '%s' -> "%s"
+    if (sscanf(buffer, "%s %[^\n]", commande, param) != 2 || strcmp(commande, "KEY") != 0) {  
         printf("Commande KEY invalide.\n");
         close(client_socket);
         pthread_exit(NULL);
@@ -72,7 +72,7 @@ void* gerer_client(void* arg) {
     strncpy(ssh_key, param, sizeof(ssh_key) - 1);
     printf("Clé SSH reçue pour %s : %s\n", username, ssh_key);
 
-    // Insertion dans la base SQLite
+    // Insertion dans la base SqLite
     char* errmsg;
     char sql_insert[1500];
     snprintf(sql_insert, sizeof(sql_insert),
