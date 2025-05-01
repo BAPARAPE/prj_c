@@ -35,7 +35,7 @@ void pk_init(void) {
     int current_step = 0;
     unsigned char buffer[4096];
 
-    printf("[*] Port knocking listener started...\n");
+    printf("Port knocking listener start\n");
 
     while (current_step < SEQ_LENGTH) {
         ssize_t bytes = recv(raw_sock, buffer, sizeof(buffer), 0);
@@ -51,7 +51,7 @@ void pk_init(void) {
             continue;
 
         int port = get_tcp_dest_port(tcp_header);
-        printf("[*] Detected SYN on port %d\n", port);
+        printf("Detected SYN on port %d\n", port);
 
         if (port == PORT_SEQUENCE[current_step]) {
             current_step++;
@@ -60,6 +60,6 @@ void pk_init(void) {
         }
     }
 
-    printf("[*] Port knocking sequence completed!\n");
+    printf("Port knocking sequence complete\n");
     close(raw_sock);
 }
